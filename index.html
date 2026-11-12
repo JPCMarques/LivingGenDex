@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Living Dex Guides — Gen 3 to 9</title>
+<meta name="description" content="Step-by-step living dex guides and trackers for Pokémon generations 3 to 9: legal, non-shiny, every HOME form.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <h1>Living Dex Guides</h1>
+        <p class="sub" id="games"></p>
+      </div>
+    </div>
+    <label class="gen-pick">
+      <span class="visually-hidden">Generation</span>
+      <select id="gen" aria-label="Generation"></select>
+    </label>
+  </div>
+  <div class="top-inner progress-row">
+    <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="pbar"><div id="pfill"></div></div>
+    <span id="ptext" class="ptext"></span>
+  </div>
+  <nav class="tabs top-inner" role="tablist">
+    <button role="tab" id="tab-guide" aria-selected="true" data-view="guide">Guide</button>
+    <button role="tab" id="tab-tracker" aria-selected="false" data-view="tracker">Tracker</button>
+  </nav>
+</header>
+
+<main>
+  <section id="boxes-sec" aria-label="Box tracker">
+    <div class="boxes-head">
+      <h2>Boxes</h2>
+      <span id="bcount" class="muted"></span>
+      <span class="spacer"></span>
+      <button id="btoggle" type="button">Collapse all</button>
+    </div>
+    <p class="muted hint">Tap a Pokémon to mark it collected. Greyed out means still to get. Sprites load from PokeAPI.</p>
+    <div id="boxes" class="boxes"></div>
+  </section>
+
+  <section id="view-guide" class="view">
+    <article id="guide" class="guide"></article>
+  </section>
+
+  <section id="view-tracker" class="view" hidden>
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="Search Pokémon, place, cart…" aria-label="Search">
+      <select id="show" aria-label="Show">
+        <option value="all">All slots</option>
+        <option value="todo">Still to get</option>
+        <option value="done">Done</option>
+      </select>
+      <select id="cart" aria-label="Cart"><option value="">Any cart</option></select>
+      <details class="more">
+        <summary>Progress data</summary>
+        <div class="more-body">
+          <p>Ticks are saved in this browser only. Copy them to another device with export / import.</p>
+          <button id="export">Export all gens</button>
+          <label class="filebtn">Import<input type="file" id="import" accept="application/json"></label>
+          <button id="reset" class="danger">Reset this gen</button>
+        </div>
+      </details>
+    </div>
+    <div class="tablewrap">
+      <table class="tracker">
+        <thead><tr><th class="c-done">Done</th><th>#</th><th>Pokémon</th><th>Form / gender</th><th>What to box</th><th>Where</th><th>Cart</th><th>Notes</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div id="unob-wrap">
+      <h2>Not obtainable on these carts</h2>
+      <p class="muted">Not counted in the progress total.</p>
+      <div class="tablewrap">
+        <table class="tracker unob">
+          <thead><tr><th>#</th><th>Pokémon</th><th>Form</th><th>Why</th><th>Status</th></tr></thead>
+          <tbody id="unob"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>Fan-made guide. Pokémon names link to <a href="https://bulbapedia.bulbagarden.net/" target="_blank" rel="noopener">Bulbapedia</a> for sprites, forms and location maps. Pokémon and all related names are trademarks of Nintendo, Creatures Inc. and GAME FREAK inc.; this site isn't affiliated with them.</p>
+</footer>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
