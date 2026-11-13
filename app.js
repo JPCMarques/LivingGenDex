@@ -213,6 +213,7 @@
       cb.checked = on; cb.closest("tr").classList.toggle("is-done", on);
     });
     updateSteps(done);
+    updateGuideSprites(done);
     updateProgress();
   }
 
@@ -309,8 +310,58 @@
     return f.toLowerCase().replace(/\b(form|forme|cloak|style|pattern|size|plumage|mode|core|flower|sweet|sea)\b/g, "")
       .split("/")[0].trim();
   }
+  // Small clickable sprites next to each Pokémon named in a step.
+  // One click ticks the next uncollected slot of that species; when all are ticked, a click clears them.
+  var gsprites = [];
+  function addGuideSprites(it, groups) {
+    var names = Object.keys(groups).sort(function (a, b) { return b.length - a.length; });
+    function textNodes() {
+      var w = document.createTreeWalker(it, NodeFilter.SHOW_TEXT, {
+        acceptNode: function (n) { return n.parentNode.closest(".gsprite,.step-badge") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT; }
+      });
+      var out = []; while (w.nextNode()) out.push(w.currentNode); return out;
+    }
+    names.forEach(function (n) {
+      var re = new RegExp("(^|[^\\wÀ-ɏ])" + n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?![\\wÀ-ɏ])");
+      var node = null, m = null;
+      textNodes().some(function (t) { m = re.exec(t.nodeValue); if (m) node = t; return !!m; });
+      if (!node) return;
+      var rows = groups[n];
+      var show = rows.filter(function (r) { return r[1] === n; })[0] || rows[0];
+      var btn = document.createElement("button");
+      btn.type = "button"; btn.className = "gsprite";
+      btn.dataset.ids = rows.map(rowId).join("\n");
+      btn.dataset.name = n;
+      var img = document.createElement("img"); img.alt = ""; img.loading = "lazy"; img.width = 32; img.height = 32;
+      setSprite(img, show);
+      btn.appendChild(img);
+      if (rows.length > 1) { var c = document.createElement("span"); c.className = "gs-count"; btn.appendChild(c); }
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        var done = load(state.gen), list = btn.dataset.ids.split("\n");
+        var next = list.filter(function (id) { return !done[id]; })[0];
+        if (next) done[next] = 1; else list.forEach(function (id) { delete done[id]; });
+        save(state.gen, done); refreshMarks();
+      });
+      var p = node.parentNode;
+      if (p.tagName === "A" && p.textContent.trim() === n) { p.parentNode.insertBefore(btn, p); return; }
+      p.insertBefore(btn, node.splitText(m.index + m[1].length));
+    });
+    gsprites = gsprites.concat(Array.prototype.slice.call(it.querySelectorAll(".gsprite")));
+  }
+  function updateGuideSprites(done) {
+    gsprites.forEach(function (b) {
+      var list = b.dataset.ids.split("\n"), n = 0;
+      list.forEach(function (id) { if (done[id]) n++; });
+      var all = n === list.length;
+      b.classList.toggle("got", all); b.classList.toggle("part", n > 0 && !all);
+      b.title = b.dataset.name + ": " + n + " of " + list.length + " collected. " + (all ? "Click to clear." : "Click to mark one collected.");
+      b.setAttribute("aria-label", b.title);
+      var c = b.querySelector(".gs-count"); if (c) c.textContent = n + "/" + list.length;
+    });
+  }
   function buildSteps(root, d) {
-    steps = [];
+    steps = []; gsprites = [];
     var byName = {};   // species or base name -> row ids
     d.rows.forEach(function (r) {
       var id = rowId(r);
@@ -344,12 +395,25 @@
             masked = masked.replace(new RegExp(p[1].source, "g"), "$1 ");  // so "Pyroar" doesn't re-match inside longer names
           }
         });
+        var groups = {};
         Object.keys(hit).forEach(function (n) {
           var cands = byName[n];
           var withForm = cands.filter(function (r) { var t = formToken(r[2]); return t && low.indexOf(t) >= 0; });
           var hasFormRows = cands.some(function (r) { return formToken(r[2]); });
-          (hasFormRows && withForm.length ? withForm : cands).forEach(function (r) { ids[rowId(r)] = 1; });
+          var seenIds = {};
+          groups[n] = (hasFormRows && withForm.length ? withForm : cands).filter(function (r) {
+            var k = rowId(r); if (seenIds[k]) return false; seenIds[k] = 1; return true;
+          });
+          groups[n].forEach(function (r) { ids[rowId(r)] = 1; });
         });
+        // Two names for the same slots (e.g. "Mankey" and "Annihilape"): keep one sprite, on the species' own name.
+        var bySet = {};
+        Object.keys(groups).forEach(function (n) {
+          var k = groups[n].map(rowId).sort().join("\n"), own = groups[n].some(function (r) { return r[1] === n; });
+          if (!bySet[k] || (own && !bySet[k].own)) bySet[k] = { n: n, own: own };
+        });
+        var keep = {}; Object.keys(bySet).forEach(function (k) { keep[bySet[k].n] = groups[bySet[k].n]; });
+        addGuideSprites(it, keep);
         var list = Object.keys(ids);
         if (!list.length) return;
         var badge = document.createElement("span");

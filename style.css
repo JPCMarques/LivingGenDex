@@ -130,3 +130,15 @@ tr.step-done td:first-child,li.step-done>p:first-child{text-decoration:line-thro
   .top-actions{width:100%}
   .top-actions .gen-pick{flex:1}
 }
+/* guide sprites: tap to mark collected */
+.gsprite{position:relative;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;width:30px;height:30px;margin:-4px 5px -4px 2px;padding:0;border:1px solid var(--line);border-radius:7px;background:var(--bg);cursor:pointer}
+.gsprite img{width:30px;height:30px;image-rendering:pixelated;filter:grayscale(1);opacity:.45;transition:filter .15s,opacity .15s}
+.gsprite.part img{filter:grayscale(.5);opacity:.75}
+.gsprite.got{background:var(--done);border-color:var(--done-ink)}
+.gsprite.got img{filter:none;opacity:1}
+.gsprite:hover{border-color:var(--accent)}
+.gsprite:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.gsprite .alt{font-size:.55rem;line-height:1;overflow:hidden}
+.gs-count{position:absolute;right:-6px;bottom:-6px;font-size:.6rem;line-height:1;padding:2px 3px;border-radius:5px;background:var(--panel);border:1px solid var(--line);color:var(--muted);font-weight:600}
+.gsprite.got .gs-count{color:var(--done-ink);border-color:var(--done-ink)}
+@media (max-width:700px){ .gsprite{width:34px;height:34px} .gsprite img{width:32px;height:32px} }
