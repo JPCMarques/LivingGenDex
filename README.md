@@ -6,7 +6,7 @@ Step-by-step guides and trackers for a legal, non-shiny living dex, Gen 3 to Gen
 - Walkthrough steps get a badge (e.g. 2/6) that turns into a ✓ once every Pokémon the step covers is collected.
 - Pick a generation from the dropdown. Links like `#gen5` or `#gen8/tracker` open a specific guide.
 - **Guide** tab: the full walkthrough, with time estimates.
-- **Tracker** tab: one row per slot. Your ticks are saved in your browser. Use **Progress data → Export/Import** to move them to another device.
+- **Tracker** tab: one row per slot. Your ticks are saved in your browser. Use the **Export / Import** button in the header to back them up or move them to another device, as a file or a text code you can paste.
 - Pokémon names link to their Bulbapedia page (sprites, forms), and locations have a "map ↗" link.
 
 ## Publish on GitHub Pages
