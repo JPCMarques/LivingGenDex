@@ -372,27 +372,123 @@
   }
 
   // ---------- export / import / reset ----------
-  $("export").addEventListener("click", function () {
-    var all = {}; GENS.forEach(function (g) { all[g] = load(g); });
-    var blob = new Blob([JSON.stringify({ livingdex: 1, progress: all }, null, 1)], { type: "application/json" });
+  var bk = $("backup"), pending = null;
+  function count(obj) { return Object.keys(obj || {}).filter(function (k) { return obj[k]; }).length; }
+  function rowIds(g) {
+    var ids = {}; (DEX[g].rows || []).forEach(function (r) { ids[rowId(r)] = 1; }); return ids;
+  }
+  function scopeGens() {
+    var v = (document.querySelector('input[name="bk-scope"]:checked') || {}).value;
+    return v === "gen" ? [state.gen] : GENS;
+  }
+  function payload() {
+    var p = {}; scopeGens().forEach(function (g) { p[g] = load(g); });
+    return { livingdex: 2, exported: new Date().toISOString(), progress: p };
+  }
+  function status(msg, bad) { var el = $("bk-status"); el.textContent = msg; el.classList.toggle("bad", !!bad); }
+  function describe(prog) {
+    return GENS.filter(function (g) { return prog[g] && count(prog[g]); }).map(function (g) {
+      return DEX[g].label + ": " + count(prog[g]) + " / " + DEX[g].rows.length;
+    }).join(" · ");
+  }
+  function refreshBackup() {
+    var lbl = DEX[state.gen].label;
+    $("bk-genlabel").textContent = lbl; $("bk-genlabel2").textContent = lbl;
+    $("bk-summary").textContent = describe(payload().progress) || "Nothing ticked yet.";
+  }
+  function openBackup() {
+    refreshBackup(); status("");
+    if (bk.showModal) bk.showModal(); else bk.setAttribute("open", "");
+  }
+  $("backup-btn").addEventListener("click", openBackup);
+  Array.prototype.forEach.call(document.querySelectorAll(".open-backup"), function (b) { b.addEventListener("click", openBackup); });
+  bk.addEventListener("click", function (e) { if (e.target === bk) bk.close(); });
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="bk-scope"]'), function (r) { r.addEventListener("change", refreshBackup); });
+
+  // Text codes: "LDX1:" + base64 of the JSON, so they survive chat apps and notes.
+  function toCode(obj) {
+    var bytes = new TextEncoder().encode(JSON.stringify(obj)), bin = "";
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return "LDX1:" + btoa(bin);
+  }
+  function parseAny(text) {
+    text = (text || "").trim();
+    var m = text.match(/LDX1:([A-Za-z0-9+/=\s]+)/);
+    if (m) {
+      var bin = atob(m[1].replace(/\s+/g, "")), bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      text = new TextDecoder().decode(bytes);
+    }
+    var data = JSON.parse(text);
+    if (!data || typeof data.progress !== "object") throw new Error("not an export");
+    var out = {};
+    Object.keys(data.progress).forEach(function (g) {
+      if (!DEX[g] || typeof data.progress[g] !== "object") return;
+      var clean = {};
+      Object.keys(data.progress[g]).forEach(function (id) { if (data.progress[g][id]) clean[id] = 1; });
+      out[g] = clean;
+    });
+    if (!Object.keys(out).length) throw new Error("no gens");
+    return out;
+  }
+
+  $("bk-download").addEventListener("click", function () {
+    var gens = scopeGens();
+    var name = "living-dex-" + (gens.length === 1 ? "gen" + gens[0] : "all") + "-" + new Date().toISOString().slice(0, 10) + ".json";
+    var blob = new Blob([JSON.stringify(payload(), null, 1)], { type: "application/json" });
     var a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = "living-dex-progress.json"; a.click();
+    a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    status("Saved " + name + ".");
   });
-  $("import").addEventListener("change", function () {
+  $("bk-copy").addEventListener("click", function () {
+    var code = toCode(payload());
+    function fallback() { $("bk-text").value = code; $("bk-text").select(); status("Couldn't reach the clipboard. The text is in the box below: copy it from there."); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(function () { status("Copied. Paste it into Import on the other device."); }, fallback);
+    } else fallback();
+  });
+
+  function preview(text) {
+    pending = null; $("bk-apply").disabled = true;
+    var box = $("bk-preview");
+    if (!text.trim()) { box.hidden = true; return; }
+    try {
+      pending = parseAny(text);
+      var unknown = 0;
+      Object.keys(pending).forEach(function (g) {
+        var ids = rowIds(g); Object.keys(pending[g]).forEach(function (id) { if (!ids[id]) unknown++; });
+      });
+      box.textContent = "Found " + describe(pending) + (unknown ? " (" + unknown + (unknown === 1 ? " tick no longer matches a slot" : " ticks no longer match a slot") + "; kept but not shown)" : "");
+      box.classList.remove("bad"); box.hidden = false; $("bk-apply").disabled = false;
+    } catch (e) {
+      box.textContent = "That isn't a living dex export."; box.classList.add("bad"); box.hidden = false;
+    }
+  }
+  $("bk-text").addEventListener("input", function () { preview(this.value); });
+  $("bk-file").addEventListener("change", function () {
     var f = this.files[0]; if (!f) return;
     var r = new FileReader();
-    r.onload = function () {
-      try {
-        var data = JSON.parse(r.result);
-        Object.keys(data.progress || {}).forEach(function (g) { if (DEX[g]) save(g, data.progress[g]); });
-        renderTracker(); refreshMarks();
-      } catch (e) { alert("That file isn't a living dex progress export."); }
-    };
+    r.onload = function () { $("bk-text").value = r.result.length > 4000 ? "" : r.result; preview(r.result); if (pending) status("Loaded " + f.name + "."); };
     r.readAsText(f); this.value = "";
   });
-  $("reset").addEventListener("click", function () {
-    if (confirm("Clear every tick for " + DEX[state.gen].label + "?")) { save(state.gen, {}); renderTracker(); refreshMarks(); }
+  $("bk-apply").addEventListener("click", function () {
+    if (!pending) return;
+    var mode = (document.querySelector('input[name="bk-mode"]:checked') || {}).value;
+    if (mode === "replace" && !confirm("Replace your ticks for " + Object.keys(pending).map(function (g) { return DEX[g].label; }).join(", ") + "? This can't be undone.")) return;
+    Object.keys(pending).forEach(function (g) {
+      var cur = mode === "merge" ? load(g) : {};
+      Object.keys(pending[g]).forEach(function (id) { cur[id] = 1; });
+      save(g, cur);
+    });
+    renderTracker(); refreshMarks(); refreshBackup();
+    status("Imported (" + (mode === "merge" ? "merged" : "replaced") + ").");
+    pending = null; $("bk-apply").disabled = true; $("bk-text").value = ""; $("bk-preview").hidden = true;
+  });
+  $("bk-reset").addEventListener("click", function () {
+    if (confirm("Clear every tick for " + DEX[state.gen].label + "?")) {
+      save(state.gen, {}); renderTracker(); refreshMarks(); refreshBackup(); status(DEX[state.gen].label + " cleared.");
+    }
   });
 
   if (!location.hash) history.replaceState(null, "", "#gen" + GENS[0]);

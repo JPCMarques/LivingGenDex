@@ -17,10 +17,13 @@
         <p class="sub" id="games"></p>
       </div>
     </div>
-    <label class="gen-pick">
-      <span class="visually-hidden">Generation</span>
-      <select id="gen" aria-label="Generation"></select>
-    </label>
+    <div class="top-actions">
+      <label class="gen-pick">
+        <span class="visually-hidden">Generation</span>
+        <select id="gen" aria-label="Generation"></select>
+      </label>
+      <button type="button" id="backup-btn" class="iconbtn" aria-haspopup="dialog">Export / Import</button>
+    </div>
   </div>
   <div class="top-inner progress-row">
     <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="pbar"><div id="pfill"></div></div>
@@ -57,15 +60,7 @@
         <option value="done">Done</option>
       </select>
       <select id="cart" aria-label="Cart"><option value="">Any cart</option></select>
-      <details class="more">
-        <summary>Progress data</summary>
-        <div class="more-body">
-          <p>Ticks are saved in this browser only. Copy them to another device with export / import.</p>
-          <button id="export">Export all gens</button>
-          <label class="filebtn">Import<input type="file" id="import" accept="application/json"></label>
-          <button id="reset" class="danger">Reset this gen</button>
-        </div>
-      </details>
+      <button type="button" class="open-backup">Export / Import</button>
     </div>
     <div class="tablewrap">
       <table class="tracker">
@@ -85,6 +80,46 @@
     </div>
   </section>
 </main>
+
+<dialog id="backup" aria-labelledby="bk-title">
+  <form method="dialog" class="bk-close-row"><h2 id="bk-title">Export / Import progress</h2><button class="iconbtn" aria-label="Close">✕</button></form>
+  <p class="muted">Your ticks are saved in this browser only. Use this to back them up or move them to another device.</p>
+
+  <section class="bk-sec">
+    <h3>Export</h3>
+    <div class="bk-row">
+      <label><input type="radio" name="bk-scope" value="all" checked> All gens</label>
+      <label><input type="radio" name="bk-scope" value="gen"> <span id="bk-genlabel">This gen</span> only</label>
+    </div>
+    <p id="bk-summary" class="muted small"></p>
+    <div class="bk-row">
+      <button type="button" id="bk-download" class="primary">Download file</button>
+      <button type="button" id="bk-copy">Copy as text</button>
+    </div>
+  </section>
+
+  <section class="bk-sec">
+    <h3>Import</h3>
+    <div class="bk-row">
+      <label class="filebtn primary">Choose file…<input type="file" id="bk-file" accept=".json,application/json,text/plain"></label>
+    </div>
+    <textarea id="bk-text" rows="3" placeholder="…or paste exported text here" spellcheck="false"></textarea>
+    <div class="bk-row">
+      <label><input type="radio" name="bk-mode" value="merge" checked> Merge with my ticks</label>
+      <label><input type="radio" name="bk-mode" value="replace"> Replace my ticks</label>
+    </div>
+    <div id="bk-preview" class="bk-preview" hidden></div>
+    <div class="bk-row">
+      <button type="button" id="bk-apply" class="primary" disabled>Import</button>
+    </div>
+  </section>
+
+  <section class="bk-sec">
+    <h3>Reset</h3>
+    <button type="button" id="bk-reset" class="danger">Clear every tick for <span id="bk-genlabel2">this gen</span></button>
+  </section>
+  <p id="bk-status" class="bk-status" role="status" aria-live="polite"></p>
+</dialog>
 
 <footer class="foot">
   <p>Fan-made guide. Pokémon names link to <a href="https://bulbapedia.bulbagarden.net/" target="_blank" rel="noopener">Bulbapedia</a> for sprites, forms and location maps. Pokémon and all related names are trademarks of Nintendo, Creatures Inc. and GAME FREAK inc.; this site isn't affiliated with them.</p>

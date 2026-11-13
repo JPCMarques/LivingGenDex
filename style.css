@@ -106,3 +106,27 @@ button{cursor:pointer}
 .step-badge.ok{background:var(--done);color:var(--done-ink);border-color:var(--done-ink)}
 tr.step-done td,li.step-done>p{color:var(--muted)}
 tr.step-done td:first-child,li.step-done>p:first-child{text-decoration:line-through;text-decoration-color:var(--done-ink)}
+/* export / import */
+.top-actions{display:flex;gap:8px;align-items:center}
+.iconbtn{font:inherit;font-size:.9rem;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);white-space:nowrap}
+.toolbar .open-backup{margin-left:auto}
+#backup{width:min(520px,94vw);max-height:90vh;overflow:auto;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink);padding:16px 20px 20px}
+#backup::backdrop{background:rgba(0,0,0,.45)}
+.bk-close-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0}
+.bk-close-row h2{margin:0;font-size:1.15rem}
+.bk-sec{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}
+.bk-sec h3{margin:0 0 8px;font-size:1rem}
+.bk-row{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin:8px 0}
+.bk-row button,.bk-sec>button,#backup .filebtn{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+#backup .primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+#backup button:disabled{opacity:.5;cursor:default}
+#bk-text{width:100%;font:13px/1.4 ui-monospace,Menlo,Consolas,monospace;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);resize:vertical}
+.small{font-size:.85rem}
+.bk-preview{font-size:.9rem;padding:8px 10px;border-radius:8px;background:var(--done);color:var(--done-ink)}
+.bk-preview.bad,.bk-status.bad{background:var(--accent-soft);color:var(--accent)}
+.bk-status{min-height:1.2em;margin:12px 0 0;font-size:.9rem;border-radius:8px}
+.bk-status:not(:empty){padding:8px 10px;background:var(--done);color:var(--done-ink)}
+@media (max-width:700px){
+  .top-actions{width:100%}
+  .top-actions .gen-pick{flex:1}
+}
