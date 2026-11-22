@@ -82,6 +82,7 @@
     el.innerHTML = d.guide;
     linkNames(el, d);
     buildSteps(el, d);
+    buildTime(el, d);
   }
   // Turn Pokémon names in the guide text into Bulbapedia links (first mention per section).
   function linkNames(root, d) {
@@ -176,7 +177,7 @@
     var pct = d.rows.length ? Math.round(n * 100 / d.rows.length) : 0;
     $("pfill").style.width = pct + "%";
     $("pbar").setAttribute("aria-valuenow", pct);
-    $("ptext").textContent = n + " / " + d.rows.length + " slots (" + pct + "%)";
+    $("ptext").textContent = n + " / " + d.rows.length + " slots (" + pct + "%)" + (timeLeft == null ? "" : " · " + (timeLeft <= 0.04 ? "all done" : fmtH(timeLeft) + " left"));
     $("bcount").textContent = n + " / " + d.rows.length + " collected";
   }
   $("rows").addEventListener("change", function (e) {
@@ -214,8 +215,143 @@
     });
     updateSteps(done);
     updateGuideSprites(done);
+    updateTime(done);
     updateProgress();
   }
+
+
+  // ---------- time left ----------
+  // One entry per row of each guide's speed-plan time table, in order.
+  //   parts: guide Parts whose step Pokémon count towards this row
+  //   carts: only rows whose Cart column matches   names: only these species
+  //   under: Part heading(s) the row's time is shown under (default: parts)
+  // A row with no Pokémon (or none matched) only goes down when its Done box is ticked.
+  var TIME = {
+    3: [{ carts: /^Sapphire/, under: [1] }, { carts: /FireRed/, under: [2] }, { carts: /^Ruby/, under: [1] },
+        { parts: [3] }, { parts: [4] }, { parts: [5] }, { under: [6] }],
+    4: [{ parts: [5] }, { parts: [3], carts: /^Diamond/ }, { parts: [3], carts: /^Pearl/ }, { parts: [1] }, { parts: [2] }, {}],
+    5: [{ parts: [1] }, { parts: [2] }, { parts: [3], carts: /^White/ }, { parts: [3], carts: /^Black$/ },
+        { carts: /^3DS/ }, { parts: [5] }, { parts: [6] }],
+    6: [{ parts: [1] }, { parts: [2] }, { parts: [3] }, { parts: [4] }, {}],
+    7: [{ carts: /^UM restart/ }, { parts: [1] }, { parts: [2] }, { parts: [3] }, { parts: [4] }, { parts: [4], names: /^Minior$/ }],
+    8: [{ parts: [1] }, { parts: [2] }, { parts: [2] }, { parts: [3], carts: /^Shield/ }, { parts: [3], carts: /2nd profile/ },
+        { parts: [5] }, { parts: [4] }, {}],
+    9: [{ parts: [1] }, { parts: [2] }, { parts: [3], carts: /^Violet/ }, { parts: [4] }, { names: /^(Archaludon|Hydrapple|Terapagos|Gouging Fire|Raging Bolt)$/, under: [5] },
+        { names: /^(Iron Boulder|Iron Crown)$/, under: [5] }, { names: /^Pecharunt$/, under: [5] }, { parts: [6] }, { parts: [6] }]
+  };
+  var phases = [], partHeads = [];
+  function hoursOf(text) {
+    var h = 0, re = /~?\s*(\d+(?:\.\d+)?)(?:\s*[–-]\s*(\d+(?:\.\d+)?))?\s*(h\b|hours?|min\b|minutes?)/gi, m;
+    while ((m = re.exec(text))) {
+      var v = m[2] ? (parseFloat(m[1]) + parseFloat(m[2])) / 2 : parseFloat(m[1]);
+      h += /^m/i.test(m[3]) ? v / 60 : v;
+    }
+    return h;
+  }
+  function fmtH(h) {
+    if (h <= 0.04) return "done";
+    if (h < 1) return "~" + Math.max(5, Math.round(h * 60 / 5) * 5) + " min";
+    return "~" + (h < 10 ? Math.round(h * 2) / 2 : Math.round(h)) + " h";
+  }
+  function buildTime(root, d) {
+    phases = []; partHeads = [];
+    var spec = TIME[state.gen] || [];
+    // find the speed-plan time table
+    var section = "", table = null;
+    Array.prototype.some.call(root.children, function (el) {
+      if (/^H[1-3]$/.test(el.tagName)) { section = el.textContent; return false; }
+      if (!/^Speed plan|^Time estimates/i.test(section)) return false;
+      var t = el.matches("table") ? el : el.querySelector && el.querySelector("table");
+      if (t && /Time/.test(t.querySelector("tr").textContent)) { table = t; return true; }
+      return false;
+    });
+    if (!table) return;
+    // Pokémon per Part, from the guide's steps
+    var partIds = {};
+    steps.forEach(function (st) { if (!st.part) return; var p = partIds[st.part] = partIds[st.part] || {}; st.ids.forEach(function (id) { p[id] = 1; }); });
+    var trs = Array.prototype.slice.call(table.querySelectorAll("tr"));
+    var head = trs.shift();
+    var th = document.createElement("th"); th.textContent = "Left"; head.appendChild(th);
+    var stop = false, i = 0;
+    trs.forEach(function (tr) {
+      var cells = tr.children, label = cells[0].textContent.trim();
+      var td = document.createElement("td"); td.className = "tleft"; tr.appendChild(td);
+      if (stop) return;
+      if (/^Total/i.test(label)) { stop = true; td.classList.add("ttotal"); phases.total = td; return; }
+      var sp = spec[i] || {}, key = "phase:" + i; i++;
+      var ids = null;
+      if (sp.parts || sp.carts || sp.names) {
+        ids = {};
+        var pool = {};
+        if (sp.parts) sp.parts.forEach(function (p) { Object.keys(partIds[p] || {}).forEach(function (id) { pool[id] = 1; }); });
+        d.rows.forEach(function (r) {
+          var id = rowId(r);
+          if (sp.parts && !pool[id]) return;
+          if (sp.carts && !sp.carts.test(r[5] || "")) return;
+          if (sp.names && !sp.names.test(r[1])) return;
+          ids[id] = 1;
+        });
+        ids = Object.keys(ids);
+        if (!ids.length) ids = null;
+      }
+      var cb = document.createElement("input"); cb.type = "checkbox"; cb.className = "tdone";
+      cb.title = "Mark this step done"; cb.setAttribute("aria-label", "Mark “" + label + "” done");
+      cb.addEventListener("change", function () { setDone(key, cb.checked); });
+      var span = document.createElement("span");
+      td.appendChild(cb); td.appendChild(span);
+      phases.push({ key: key, hours: hoursOf(tr.textContent.replace(label, "")), ids: ids, under: sp.under || sp.parts || [], cb: cb, out: span, tr: tr });
+    });
+    // Part headings
+    Array.prototype.forEach.call(root.querySelectorAll("h2,h3"), function (h) {
+      var m = h.textContent.match(/^Part\s*(\d+)/i); if (!m) return;
+      var n = +m[1], mine = phases.filter(function (p) { return p.under.indexOf(n) >= 0; });
+      if (!mine.length) return;
+      var tag = document.createElement("span"); tag.className = "tpart";
+      var own = mine.filter(function (p) { return p.under.length === 1; });
+      var btn = null;
+      if (own.length) {
+        btn = document.createElement("button"); btn.type = "button"; btn.className = "tpart-done";
+        btn.addEventListener("click", function () {
+          var done = load(state.gen), all = own.every(function (p) { return done[p.key]; });
+          own.forEach(function (p) { if (all) delete done[p.key]; else done[p.key] = 1; });
+          save(state.gen, done); refreshMarks();
+        });
+      }
+      h.appendChild(tag); if (btn) h.appendChild(btn);
+      partHeads.push({ n: n, phases: mine, own: own, tag: tag, btn: btn, hours: hoursOf(h.firstChild.textContent.replace(/^[^(]*/, "")) });
+    });
+  }
+  function phaseLeft(p, done) {
+    if (done[p.key]) return 0;
+    if (!p.ids) return p.hours;
+    var left = 0; p.ids.forEach(function (id) { if (!done[id]) left++; });
+    return p.hours * left / p.ids.length;
+  }
+  function updateTime(done) {
+    var total = 0, full = 0;
+    phases.forEach(function (p) {
+      var l = phaseLeft(p, done); total += l; full += p.hours;
+      p.cb.checked = !!done[p.key];
+      p.out.textContent = fmtH(l);
+      p.tr.classList.toggle("is-done", l <= 0.04);
+      p.cb.title = p.ids ? "Tick to count this step done even if Pokémon are missing" : "Tick when this step is done";
+    });
+    if (phases.total) phases.total.textContent = fmtH(total);
+    partHeads.forEach(function (ph) {
+      var l = 0, full = 0;
+      ph.phases.forEach(function (p) { l += phaseLeft(p, done) / p.under.length; full += p.hours / p.under.length; });
+      if (ph.hours && full) l = ph.hours * l / full;  // match the heading's own estimate
+      ph.tag.textContent = l <= 0.04 ? "✓ done" : fmtH(l) + " left";
+      ph.tag.classList.toggle("ok", l <= 0.04);
+      if (ph.btn) {
+        var all = ph.own.every(function (p) { return done[p.key]; });
+        ph.btn.textContent = all ? "Undo done" : "Mark done";
+        ph.btn.setAttribute("aria-pressed", all);
+      }
+    });
+    timeLeft = phases.length ? total : null;
+  }
+  var timeLeft = null;
 
   // ---------- sprites (PokeAPI) ----------
   var SPR = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/";
@@ -421,7 +557,8 @@
         badge.title = "Box slots this step covers";
         var host = it.tagName === "TR" ? it.querySelector("td") : (it.querySelector(":scope > p") || it);
         host.insertBefore(badge, host.firstChild);
-        steps.push({ el: it, badge: badge, ids: list });
+        var pm = section.match(/^Part\s*(\d+)/i);
+        steps.push({ el: it, badge: badge, ids: list, part: pm ? +pm[1] : 0 });
       });
     });
   }
@@ -437,7 +574,7 @@
 
   // ---------- export / import / reset ----------
   var bk = $("backup"), pending = null;
-  function count(obj) { return Object.keys(obj || {}).filter(function (k) { return obj[k]; }).length; }
+  function count(obj) { return Object.keys(obj || {}).filter(function (k) { return obj[k] && k.indexOf("phase:") !== 0; }).length; }
   function rowIds(g) {
     var ids = {}; (DEX[g].rows || []).forEach(function (r) { ids[rowId(r)] = 1; }); return ids;
   }
@@ -521,7 +658,7 @@
       pending = parseAny(text);
       var unknown = 0;
       Object.keys(pending).forEach(function (g) {
-        var ids = rowIds(g); Object.keys(pending[g]).forEach(function (id) { if (!ids[id]) unknown++; });
+        var ids = rowIds(g); Object.keys(pending[g]).forEach(function (id) { if (!ids[id] && id.indexOf("phase:") !== 0) unknown++; });
       });
       box.textContent = "Found " + describe(pending) + (unknown ? " (" + unknown + (unknown === 1 ? " tick no longer matches a slot" : " ticks no longer match a slot") + "; kept but not shown)" : "");
       box.classList.remove("bad"); box.hidden = false; $("bk-apply").disabled = false;
